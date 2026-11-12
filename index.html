@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyLink Airways: Company Dashboard</title>
+<style>
+:root{--bg:#EEF2F3;--card:#fff;--ink:#0F2A3A;--mute:#5B7080;--line:#D5DEE2;--a:#0E7C7B;--b:#E09F3E;--c:#C8553D;--d:#3A5A8C;--e:#7A8F9B}
+@media (prefers-color-scheme:dark){:root{--bg:#0B1A24;--card:#122634;--ink:#E7EFF2;--mute:#97ADB9;--line:#243C4B;--a:#35B5B3;--b:#F0B65A;--c:#E57C63;--d:#7FA3DC;--e:#8EA3AE}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.45}
+header{background:var(--ink);color:var(--bg);padding:18px 24px 0}
+header h1{margin:0;font-size:1.35rem}header p{margin:2px 0 12px;font-size:.85rem;opacity:.75}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.ctl{display:flex;gap:10px;align-items:center;font-size:.85rem}
+select,.rf{font:inherit;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+nav{display:flex;gap:4px;overflow-x:auto;margin-top:8px}
+nav button{font:inherit;font-weight:600;background:none;border:0;color:inherit;opacity:.7;padding:10px 14px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+nav button[aria-selected=true]{opacity:1;border-color:var(--b)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--b);outline-offset:2px}
+main{padding:20px 24px 30px;max-width:1200px;margin:0 auto}
+.err{background:var(--c);color:#fff;padding:10px 24px;font-size:.9rem}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:18px}
+.k{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.k b{display:block;font-size:1.7rem;line-height:1.1}.k span{font-size:.82rem;color:var(--mute)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.p{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.p h2{margin:0 0 2px;font-size:1rem}.p small{color:var(--mute);display:block;margin-bottom:10px}
+.wide{grid-column:1/-1}.sc{overflow-x:auto}.na{color:var(--mute);font-style:italic}
+svg{width:100%;height:auto;display:block}svg text{fill:var(--mute);font:11px system-ui,sans-serif}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--mute)}
+.n{text-align:right;font-variant-numeric:tabular-nums}
+.tag{padding:2px 8px;border-radius:99px;font-size:.78rem;font-weight:600;color:#fff}
+.legend{display:flex;flex-direction:column;gap:6px;font-size:.82rem;color:var(--mute)}.legend s{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:.79rem;color:var(--mute)}
+.form input,.form select,.form textarea{font:inherit;padding:7px 9px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);width:100%}
+.form textarea{min-height:62px;resize:vertical}
+.form .full{grid-column:1/-1}
+.btn{font:inherit;font-weight:600;padding:8px 16px;border-radius:6px;border:0;background:var(--a);color:#fff;cursor:pointer}
+.btn:hover{opacity:.9}
+.btn.sm{padding:4px 10px;font-size:.78rem;background:var(--c)}
+.msg{font-size:.85rem;margin-top:8px;min-height:1em}
+.msg.ok{color:var(--a)}.msg.bad{color:var(--c)}
+footer{font-size:.78rem;color:var(--mute);padding:0 24px 24px;max-width:1200px;margin:0 auto}
+</style>
+</head>
+<body>
+<header>
+ <div class="bar">
+  <div><h1>SkyLink Airways: Company Dashboard</h1><p id="sub">Loading from the data warehouse…</p></div>
+  <div class="ctl"><label>Route <select id="route"></select></label><button class="rf" id="rf">Refresh</button></div>
+ </div>
+ <nav role="tablist" id="tabs"></nav>
+</header>
+<div id="err" class="err" hidden></div>
+<main id="main"></main>
+<footer id="foot"></footer>
+<script>
+const VIEWS=["vw_kpi_executive","vw_revenue_by_destination","vw_monthly_trend","vw_occupancy_by_flight","vw_delay_share","vw_revenue_summary","vw_payment_mix","vw_customer_kpi","vw_repeat_passengers","vw_tier_mix","vw_nationality_mix","vw_flights_today","vw_alerts_today","vw_unpaid_imminent","vw_etl_audit","vw_reject_queue","vw_integrity_check"];
+const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const COLS=["var(--a)","var(--b)","var(--c)","var(--d)","var(--e)"];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let D={},route="ALL",cur="overview";
+let REFS={passengers:[],flights:[],payments:[]},RECS=[],FLASH=null;
+const TODAY=new Date().toISOString().slice(0,10);
+
+/* ---------- data access ---------- */
+async function load(){
+  $("#sub").textContent="Refreshing…";
+  const res=await Promise.allSettled(VIEWS.map(v=>fetch("/api/"+v).then(r=>{if(!r.ok)throw new Error(v);return r.json()})));
+  const failed=[];
+  VIEWS.forEach((v,i)=>{if(res[i].status==="fulfilled")D[v]=res[i].value;else{D[v]=null;failed.push(v)}});
+  const e=$("#err");
+  if(failed.length===VIEWS.length){e.hidden=false;e.textContent="Cannot reach the data server. Check that app.py is running and DATABASE_URL is correct."}
+  else if(failed.length){e.hidden=false;e.textContent="These views failed to load (check they exist in the database): "+failed.join(", ")}
+  else e.hidden=true;
+  const routes=[...new Set((D.vw_kpi_executive||[]).map(r=>r.route_code))].sort();
+  const old=route;
+  $("#route").innerHTML='<option value="ALL">All routes</option>'+routes.map(r=>`<option>${r}</option>`).join("");
+  route=routes.includes(old)?old:"ALL";$("#route").value=route;
+  $("#sub").textContent="Live from the data warehouse";
+  $("#foot").textContent="Last refreshed "+new Date().toLocaleTimeString()+". Reloads automatically every 5 minutes.";
+  draw();
+}
+async function loadRefs(){
+  try{REFS=await (await fetch("/api/refs")).json()}
+  catch(e){REFS={passengers:[],flights:[],payments:[]}}
+}
+async function loadRecords(){
+  try{RECS=await (await fetch("/api/records")).json()}
+  catch(e){RECS=[]}
+}
+async function refreshAll(){await Promise.all([loadRefs(),loadRecords()]);await load()}
+const rows=v=>(D[v]||[]).filter(r=>route==="ALL"||!("route_code" in r)||r.route_code===route);
+const S=(a,k)=>a.reduce((s,r)=>s+(+r[k]||0),0);
+const W=(a,k,w)=>{const t=S(a,w);return t?a.reduce((s,r)=>s+(+r[k]||0)*(+r[w]||0),0)/t:0};
+const fmt=(n,d=1)=>(+n).toLocaleString("en-GH",{maximumFractionDigits:d});
+function group(a,key,val){const m=new Map();a.forEach(r=>m.set(key(r),(m.get(key(r))||0)+(+val(r)||0)));return [...m]}
+const first=v=>(D[v]&&D[v][0])||{};
+
+/* ---------- chart helpers ---------- */
+function bars(items,f,h=210){const w=520,m=26,mx=Math.max(...items.map(i=>i[1]),1)*1.15,bw=(w-20)/items.length;
+ return `<svg viewBox="0 0 ${w} ${h}">${items.map((it,i)=>{const bh=(h-m-18)*it[1]/mx,x=10+i*bw;
+ return `<rect x="${x+bw*.15}" y="${h-m-bh}" width="${bw*.7}" height="${bh}" rx="3" fill="var(--a)"/><text x="${x+bw/2}" y="${h-m-bh-5}" text-anchor="middle">${f(it[1])}</text><text x="${x+bw/2}" y="${h-8}" text-anchor="middle">${it[0]}</text>`}).join("")}</svg>`}
+function line(items,h=210){if(items.length<2)return bars(items,v=>fmt(v));const w=520,p=28,mx=Math.max(...items.map(i=>i[1]),1)*1.1,st=(w-2*p)/(items.length-1);
+ const pts=items.map((it,i)=>[p+i*st,h-26-(h-46)*it[1]/mx]),d=pts.map(q=>q.join(",")).join("L");
+ return `<svg viewBox="0 0 ${w} ${h}"><path d="M${d}L${pts.at(-1)[0]},${h-26}L${p},${h-26}Z" fill="var(--a)" opacity=".12"/><path d="M${d}" fill="none" stroke="var(--a)" stroke-width="2.5"/>${pts.map((q,i)=>`<circle cx="${q[0]}" cy="${q[1]}" r="3.5" fill="var(--a)"/><text x="${q[0]}" y="${h-8}" text-anchor="middle">${items[i][0]}</text>`).join("")}<text x="${pts.at(-1)[0]}" y="${pts.at(-1)[1]-9}" text-anchor="end">${fmt(items.at(-1)[1])}</text></svg>`}
+function hbars(items,max=100){const w=520,rh=34;
+ return `<svg viewBox="0 0 ${w} ${items.length*rh+4}">${items.map((it,i)=>{const y=i*rh+4,bw=Math.max(0,(w-190)*it[1]/max),c=it[1]>=85?"var(--a)":it[1]>=75?"var(--b)":"var(--c)";
+ return `<text x="0" y="${y+18}">${it[0]}</text><rect x="120" y="${y+4}" width="${bw}" height="18" rx="3" fill="${c}"/><text x="${126+bw}" y="${y+18}">${fmt(it[1],0)}%</text>`}).join("")}</svg>`}
+function donut(items){const r=70,cx=90,cy=90,tot=items.reduce((s,i)=>s+i[1],0)||1;let a=-Math.PI/2;
+ const arcs=items.map((it,i)=>{const t=it[1]/tot*2*Math.PI,x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a);a+=t;const x2=cx+r*Math.cos(a),y2=cy+r*Math.sin(a);
+ return `<path d="M${x1},${y1}A${r},${r} 0 ${t>Math.PI?1:0} 1 ${x2},${y2}" fill="none" stroke="${COLS[i%5]}" stroke-width="28"/>`}).join("");
+ return `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap"><svg viewBox="0 0 180 180" style="width:170px">${arcs}</svg><div class="legend">${items.map((it,i)=>`<span><s style="background:${COLS[i%5]}"></s>${it[0]}: ${fmt(it[1]/tot*100)}%</span>`).join("")}</div></div>`}
+const kpi=(v,l)=>`<div class="k"><b>${v}</b><span>${l}</span></div>`;
+const panel=(t,s,v,body,cls="")=>`<div class="p ${cls}"><h2>${t}</h2><small>${s}</small>${D[v]&&D[v].length?body():`<div class="na">No data from ${v}</div>`}</div>`;
+const table=(h,r,al=[])=>`<div class="sc"><table><tr>${h.map((x,i)=>`<th class="${al[i]||""}">${x}</th>`).join("")}</tr>${r.map(c=>`<tr>${c.map((x,i)=>`<td class="${al[i]||""}">${x}</td>`).join("")}</tr>`).join("")}</table></div>`;
+const tag=s=>`<span class="tag" style="background:${/delay/i.test(s)?"var(--c)":"var(--a)"}">${s}</span>`;
+const mlabel=r=>isNaN(r.month)?String(r.month):MONTHS[r.month-1];
+const trend=f=>group(rows("vw_monthly_trend").sort((a,b)=>a.year-b.year||a.month-b.month),r=>r.year+" "+mlabel(r),f);
+
+/* ---------- tabs ---------- */
+const TABS={
+ overview(){const k=rows("vw_kpi_executive"),o=first("vw_integrity_check").orphan_fact_rows;
+  return `<div class="kpis">${kpi(fmt(S(k,"total_passengers"),0),"Total passengers")}${kpi("GH₵"+fmt(S(k,"total_revenue_ghs")/1e6,2)+"M","Total revenue")}${kpi(fmt(W(k,"avg_occupancy_pct","total_passengers"),0)+"%","Average occupancy")}${kpi(fmt(W(k,"delayed_flights_pct","total_passengers"))+"%","Delayed flights")}${kpi(o===undefined?"n/a":o,"Fact rows with no dimension")}</div><div class="grid">
+  ${panel("Revenue by destination","GH₵ millions","vw_revenue_by_destination",()=>bars(rows("vw_revenue_by_destination").map(r=>[r.destination,r.revenue_ghs/1e6]),v=>fmt(v,2)))}
+  ${panel("Passenger volume trend","passengers per month","vw_monthly_trend",()=>line(trend(r=>r.passengers)))}
+  ${panel("Flight occupancy","average % of seats sold","vw_occupancy_by_flight",()=>hbars(rows("vw_occupancy_by_flight").map(r=>[r.flightnumber+" "+r.route_code,r.avg_occupancy_pct])))}
+  ${panel("Share of delays by route","% of delayed flights, all routes","vw_delay_share",()=>donut(D.vw_delay_share.map(r=>[r.destination,r.delayed_flights])))}</div>`},
+ revenue(){const s=rows("vw_revenue_summary"),k=rows("vw_kpi_executive"),rev=S(s,"fare_revenue_ghs");
+  return `<div class="kpis">${kpi("GH₵"+fmt(rev/1e6,2)+"M","Fare revenue")}${kpi("GH₵"+fmt(rev/(S(k,"total_passengers")||1),0),"Revenue per passenger")}${kpi("GH₵"+fmt(S(s,"outstanding_balance_ghs")/1e6,2)+"M","Outstanding balances")}${kpi(fmt(s.length?s.reduce((a,r)=>a+r.refund_rate_pct,0)/s.length:0)+"%","Refund rate")}</div><div class="grid">
+  ${panel("Monthly revenue","GH₵ millions","vw_monthly_trend",()=>line(trend(r=>r.revenue_ghs).map(([a,b])=>[a,b/1e6])))}
+  ${panel("Payment method mix","share of transactions","vw_payment_mix",()=>donut(group(rows("vw_payment_mix"),r=>r.paymentmethod,r=>r.transactions)))}
+  ${panel("Route profitability","revenue and passengers by route","vw_revenue_by_destination",()=>table(["Route","Destination","Passengers","Revenue (GH₵M)","Per passenger"],rows("vw_revenue_by_destination").map(r=>[r.route_code,r.destination,fmt(r.passengers,0),fmt(r.revenue_ghs/1e6,2),"GH₵"+fmt(r.revenue_ghs/(r.passengers||1),0)]),["","","n","n","n"]),"wide")}</div>`},
+ flights(){const k=rows("vw_kpi_executive");
+  return `<div class="kpis">${kpi(fmt(W(k,"delayed_flights_pct","total_passengers"))+"%","Delayed flights")}${kpi(fmt(W(k,"avg_delay_min","total_passengers"),0)+" min","Average delay")}${kpi(fmt(W(k,"avg_occupancy_pct","total_passengers"),0)+"%","Average occupancy")}</div><div class="grid">
+  ${panel("Occupancy by flight","green 85+, amber 75 to 84, red below 75","vw_occupancy_by_flight",()=>hbars(rows("vw_occupancy_by_flight").map(r=>[r.flightnumber+" "+r.route_code,r.avg_occupancy_pct])))}
+  ${panel("Average delay by route","minutes","vw_delay_share",()=>bars(D.vw_delay_share.map(r=>[r.destination,r.avg_delay_min]),v=>fmt(v,0)))}
+  ${panel("Share of delays by route","% of delayed flights","vw_delay_share",()=>donut(D.vw_delay_share.map(r=>[r.destination,r.delayed_flights])))}</div>`},
+ customers(){const c=first("vw_customer_kpi"),rp=first("vw_repeat_passengers");
+  return `<div class="kpis">${kpi(fmt(c.unique_passengers||0,0),"Unique passengers")}${kpi(fmt(c.member_pct||0,0)+"%","Frequent-flyer members")}${kpi(fmt(c.avg_seats_per_booking||0),"Seats per booking")}${kpi(fmt(rp.repeat_pct||0,0)+"%","Repeat passengers")}</div><div class="grid">
+  ${panel("Frequent-flyer tier mix","share of passengers","vw_tier_mix",()=>donut(D.vw_tier_mix.map(r=>[r.frequentflyertier,r.share_pct])))}
+  ${panel("Passenger nationality","% of passengers","vw_nationality_mix",()=>hbars(D.vw_nationality_mix.map(r=>[r.nationality,r.share_pct]),Math.max(...D.vw_nationality_mix.map(r=>r.share_pct))))}
+  ${panel("Seasonal demand","passengers by month","vw_monthly_trend",()=>bars(trend(r=>r.passengers),v=>fmt(v,0)))}</div>`},
+ operations(){const t=rows("vw_flights_today"),al=rows("vw_alerts_today");
+  return `<div class="kpis">${kpi(t.length,"Flights today")}${kpi(t.filter(r=>/delay/i.test(r.status)).length,"Delayed now")}${kpi(fmt(S(t,"seats_sold")/(S(t,"seat_capacity")||1)*100,0)+"%","Seats sold today")}${kpi("GH₵"+fmt((first("vw_unpaid_imminent").unpaid_ghs||0)/1e3,0)+"k","Unpaid on today's flights")}</div><div class="grid">
+  ${panel("Today's flights","current day","vw_flights_today",()=>table(["Flight","Route","Departs","Gate","Status","Delay","Sold / capacity"],t.map(r=>[r.flightnumber,r.route_code,r.departuretime,r.gatenumber,tag(r.status),r.delay_minutes+" min",r.seats_sold+" / "+r.seat_capacity]),["","","","","","n","n"]),"wide")}
+  ${panel("Alerts","threshold exceptions","vw_alerts_today",()=>`<ul style="margin:0;padding-left:18px">${al.map(r=>`<li>${r.flightnumber} ${r.route_code}: ${r.alert}</li>`).join("")}</ul>`,"wide")}</div>`},
+ quality(){const a=D.vw_etl_audit||[],bad=a.filter(r=>r.unreconciled!=0).length,o=first("vw_integrity_check").orphan_fact_rows;
+  return `<div class="kpis">${kpi(o===undefined?"n/a":o,"Fact rows with no dimension")}${kpi(a.length?(bad?bad+" batches":"All reconciled"):"n/a","ETL reconciliation")}${kpi((D.vw_reject_queue||[]).length,"Rejected records")}</div><div class="grid">
+  ${panel("ETL audit by batch","extracted = loaded + rejected + duplicates removed","vw_etl_audit",()=>table(["Batch","Source","Extracted","Duplicates","Rejected","Loaded","Unreconciled"],a.map(r=>[r.batch_id,r.source,r.extracted,r.duplicates_removed,r.rejected,r.loaded,r.unreconciled]),["","","n","n","n","n","n"]))}
+  ${panel("Reject queue","awaiting data steward review","vw_reject_queue",()=>table(["Batch","Booking","Reason"],D.vw_reject_queue.map(r=>[r.batch_id,r.booking_id,r.reason])))}</div>`},
+ records(){
+  const pOpts=REFS.passengers.map(p=>`<option value="${p.passenger_key}">${esc(p.name)} (#${p.passenger_key})</option>`).join("");
+  const fOpts=REFS.flights.map(f=>`<option value="${f.flight_key}">${esc(f.flightnumber)} ${esc(f.route)}</option>`).join("");
+  const payOpts=REFS.payments.map(p=>`<option value="${p.payment_key}">#${p.payment_key} ${esc(p.method)} (${esc(p.currency)})</option>`).join("");
+  const flash=FLASH?`<div class="msg ${FLASH.ok?"ok":"bad"}">${esc(FLASH.text)}</div>`:"";
+  return `${flash}<div class="grid">
+   <div class="p"><h2>Save a record</h2><small>Store any information and find it here later</small>
+    <form class="form" data-form="record">
+     <label>Title<input name="title" required maxlength="200"></label>
+     <label>Category<input name="category" placeholder="General" maxlength="50"></label>
+     <label class="full">Details<textarea name="body" placeholder="Write anything you want to keep"></textarea></label>
+     <div class="full"><button class="btn">Save record</button><div class="msg" data-msg></div></div>
+    </form></div>
+   <div class="p"><h2>Add passenger</h2><small>Creates a new passenger</small>
+    <form class="form" data-form="passenger">
+     <label>Full name<input name="full_name" required maxlength="100"></label>
+     <label>Nationality<input name="nationality" maxlength="50"></label>
+     <label>Tier<select name="tier"><option>Blue</option><option>Silver</option><option>Gold</option><option>Platinum</option></select></label>
+     <label>Contact<input name="contact" maxlength="150"></label>
+     <div class="full"><button class="btn">Save passenger</button><div class="msg" data-msg></div></div>
+    </form></div>
+   <div class="p"><h2>Add flight</h2><small>Creates a new current flight</small>
+    <form class="form" data-form="flight">
+     <label>Flight number<input name="flight_number" required maxlength="10"></label>
+     <label>Airline<input name="airline" maxlength="50"></label>
+     <label>Origin (IATA)<input name="origin" required maxlength="3" placeholder="ACC"></label>
+     <label>Destination (IATA)<input name="destination" required maxlength="3" placeholder="LHR"></label>
+     <label>Aircraft<input name="aircraft" maxlength="30"></label>
+     <label>Departure<input type="time" name="departure"></label>
+     <label>Effective date<input type="date" name="effective_date" value="${TODAY}"></label>
+     <div class="full"><button class="btn">Save flight</button><div class="msg" data-msg></div></div>
+    </form></div>
+   <div class="p"><h2>Add payment</h2><small>Creates a payment option</small>
+    <form class="form" data-form="payment">
+     <label>Method<input name="payment_method" required maxlength="30" placeholder="Mobile Money"></label>
+     <label>Currency<input name="currency" value="GHS" maxlength="3" required></label>
+     <label>Date<input type="date" name="transaction_date" value="${TODAY}"></label>
+     <label>Refund status<select name="refund_status"><option>None</option><option>Pending</option><option>Partial</option><option>Refunded</option></select></label>
+     <div class="full"><button class="btn">Save payment</button><div class="msg" data-msg></div></div>
+    </form></div>
+   <div class="p wide"><h2>Add booking</h2><small>Links a passenger, flight and payment into a booking</small>
+    <form class="form" data-form="booking">
+     <label class="full">Passenger<select name="passenger_key" required>${pOpts}</select></label>
+     <label>Flight<select name="flight_key" required>${fOpts}</select></label>
+     <label>Booking date<input type="date" name="booking_date" required value="${TODAY}"></label>
+     <label>Seats<input type="number" name="seats" min="1" value="1" required></label>
+     <label>Fare (GH&#8373;)<input type="number" name="fare" min="0" step="0.01" value="0" required></label>
+     <label>Outstanding (GH&#8373;)<input type="number" name="outstanding" min="0" step="0.01" value="0"></label>
+     <label>Status<select name="status"><option>Paid</option><option>Partial</option><option>Unpaid</option></select></label>
+     <label>Payment<select name="payment_key" required>${payOpts}</select></label>
+     <div class="full"><button class="btn">Save booking</button><div class="msg" data-msg></div></div>
+    </form></div>
+   <div class="p wide"><h2>Saved records (${RECS.length})</h2><small>Everything you stored from this page</small>
+    ${RECS.length?table(["When","Title","Category","Details",""],RECS.map(r=>[esc(r.created),esc(r.title),esc(r.category),esc(r.body||""),`<button class="btn sm" data-del="${r.id}">Delete</button>`])):'<div class="na">No records yet. Save one above.</div>'}
+   </div>
+  </div>`
+ }
+};
+const NAMES={overview:"Executive overview",revenue:"Revenue",flights:"Flights and delays",customers:"Customers",operations:"Operations today",quality:"Data quality",records:"Add / records"};
+function draw(){try{$("#main").innerHTML=TABS[cur]()}catch(e){$("#main").innerHTML='<div class="p na">This tab could not be drawn: '+e.message+'</div>'}
+ document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.t===cur))}
+$("#tabs").innerHTML=Object.keys(NAMES).map(k=>`<button role="tab" data-t="${k}">${NAMES[k]}</button>`).join("");
+$("#tabs").onclick=e=>{if(e.target.dataset.t){cur=e.target.dataset.t;FLASH=null;draw()}};
+$("#route").onchange=e=>{route=e.target.value;draw()};
+$("#rf").onclick=load;
+
+const SAVE_URL={record:"/api/records",passenger:"/api/passengers",flight:"/api/flights",payment:"/api/payments",booking:"/api/bookings"};
+async function submitForm(form){
+  const kind=form.dataset.form, msg=form.querySelector("[data-msg]");
+  const data=Object.fromEntries(new FormData(form));
+  msg.className="msg";msg.textContent="Saving…";
+  try{
+    const r=await fetch(SAVE_URL[kind],{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||("Save failed ("+r.status+")"));
+    FLASH={ok:true,text:kind==="record"?"Record saved. It will be here whenever you come back.":"Saved. The dashboard numbers will update now."};
+    await refreshAll();
+  }catch(err){
+    msg.className="msg bad";msg.textContent=err.message;
+  }
+}
+$("#main").addEventListener("submit",e=>{const f=e.target.closest("form[data-form]");if(f){e.preventDefault();submitForm(f)}});
+$("#main").addEventListener("click",async e=>{
+  const b=e.target.closest("[data-del]");if(!b)return;
+  if(!confirm("Delete this record?"))return;
+  try{
+    const r=await fetch("/api/records/"+b.dataset.del,{method:"DELETE"});
+    if(!r.ok)throw new Error("Delete failed");
+    FLASH={ok:true,text:"Record deleted."};
+  }catch(err){FLASH={ok:false,text:err.message}}
+  await refreshAll();
+});
+
+(async()=>{await Promise.all([loadRefs(),loadRecords()]);await load()})();
+setInterval(load,300000);
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+flask
+sqlalchemy
+# add ONE driver for your database:
+# pymysql          (MySQL)
+# psycopg2-binary  (PostgreSQL)
+# pyodbc           (SQL Server)
+# SQLite needs no extra driver
